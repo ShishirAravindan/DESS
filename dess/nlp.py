@@ -24,7 +24,7 @@ DEPARTMENT_PATTERNS = {
         r'professor in the department of(?: the| public)? ([A-Za-z]+)',
         r'(?:of|in)(?: the| public)? ([A-Za-z]+) department',
         r'(?:in the )?department(?:s|.)? of(?: the|.| public)? ([A-Za-z]+)',
-        r'department: ([A-Za-z]+)',
+         r'the ([A-Za-z]+) department',
         r'professor (?:of|in)(?: the)? ([A-Za-z]+)',
         r'chair in(?: the)? ([A-Za-z]+)',
         r'professor emerit(?:us|a) of(?: the| public)? ([A-Za-z]+)',
