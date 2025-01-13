@@ -24,13 +24,12 @@ DEPARTMENT_PATTERNS = {
         r'professor in the department of(?: the| public)? ([A-Za-z]+)',
         r'(?:of|in)(?: the| public)? ([A-Za-z]+) department',
         r'(?:in the )?department(?:s|.)? of(?: the|.| public)? ([A-Za-z]+)',
-         r'the ([A-Za-z]+) department',
+        r'the ([A-Za-z]+) department',
         r'professor (?:of|in)(?: the)? ([A-Za-z]+)',
         r'chair in(?: the)? ([A-Za-z]+)',
         r'professor emerit(?:us|a) of(?: the| public)? ([A-Za-z]+)',
         r'faculty of(?: the)? ([A-Za-z]+)',
-        r'(?:of|in) the ([A-Za-z]+) ([A-Za-z]+) department',
-        r'professor, ([A-Za-z]+)'
+        r'(?:of|in) the ([A-Za-z]+) ([A-Za-z]+) department'
     ],
         
     # Backup patterns - contextual department mentions
@@ -46,7 +45,8 @@ DEPARTMENT_PATTERNS = {
         r'(?:school|college) of(?: the| public)? ([A-Za-z]+)',
         r'center for(?: the)? ([A-Za-z]+)',
         r'\bph\.?d\.?\s*(?:in|of|from)?\s*([A-Za-z]+)',
-        r'is (?:a|an) ([A-Za-z]+) professor'
+        r'is (?:a|an) ([A-Za-z]+) professor',
+        r'professor, ([A-Za-z]+)'
     ]
 }
 
