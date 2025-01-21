@@ -21,19 +21,20 @@ CRITERIA_FLAGS = {
 DEPARTMENT_PATTERNS = {
     # Primary patterns - indicate professor role (sets isProfessor2=True)
     'primary': [
-        r'professor in the department of(?: the| public)? ([A-Za-z]+)',
-        r'(?:of|in)(?: the| public)? ([A-Za-z]+) department',
-        r'(?:in the )?department(?:s|.)? of(?: the|.| public)? ([A-Za-z]+)',
+        r'professor in the (?:dept|department) of(?: the| public)? ([A-Za-z]+)',
+        r'(?:of|in)(?: the| public)? ([A-Za-z]+) (?:dept|department)',
+        r'(?:in the )?(?:dept|department)(?:s|.)? of(?: the|.| public)? ([A-Za-z]+)',
         r'the ([A-Za-z]+) department',
         r'professor (?:of|in)(?: the)? ([A-Za-z]+)',
         r'chair in(?: the)? ([A-Za-z]+)',
         r'professor emerit(?:us|a) of(?: the| public)? ([A-Za-z]+)',
         r'faculty of(?: the)? ([A-Za-z]+)',
-        r'(?:of|in) the ([A-Za-z]+) ([A-Za-z]+) department'
+        r'(?:of|in) the ([A-Za-z]+) ([A-Za-z]+) (?:dept|department)'
     ],
         
     # Backup patterns - contextual department mentions
     'backup': [
+        r'(?:a|an) ([A-Za-z]+) professor',
         r'book on(?: the)? ([A-Za-z]+)',
         r'in the area of(?: the)? ([A-Za-z]+)',
         r'research(?: primarily)? focused on(?: the)? ([A-Za-z]+)',
@@ -44,14 +45,15 @@ DEPARTMENT_PATTERNS = {
         r'leader in(?: the)? ([A-Za-z]+)',
         r'(?:school|college) of(?: the| public)? ([A-Za-z]+)',
         r'center for(?: the)? ([A-Za-z]+)',
-        r'\bph\.?d\.?\s*(?:in|of|from)?\s*([A-Za-z]+)',
+        r'ph\.?d\.?\s*(?:degree\s+)?(?:in|of|from)?\s*([A-Za-z]+)',
         r'is (?:a|an) ([A-Za-z]+) professor',
         r'professor, ([A-Za-z]+)'
     ]
 }
 
 # Words to ignore if this is the department that's extracted — minimize false positives
-IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','university','adjunct','school','senior','college','emeritus']
+IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','university','adjunct',
+                'school','senior','college','emeritus', 'degree', 'current', 'phone', 'faculty', 'dept', 'in']
 
 # ------------------------------------------------------------------------------
 
@@ -59,7 +61,7 @@ def extract_department_information(df: pd.DataFrame):
     """Populates the isFaculty and department columns in the DataFrame."""
     df[['isProfessor', 'isInstructor', 'isEmeritus', 'isAssistantProf', 'isAssociateProf', 
         'isFullProf', 'isClinicalProf', 'isResearcher', 'teaching_intensity', 'isProfessor2', 
-        'department_textual', 'department_keyword']] =  df.apply(
+        'department_textual', 'department_keyword', 'keyword_precision']] =  df.apply(
         lambda row: populate_faculty_columns(row['rawText']),
         axis=1,
         result_type='expand'
@@ -67,8 +69,8 @@ def extract_department_information(df: pd.DataFrame):
 
 def populate_faculty_columns(rawText: list[str]):
     flags = populate_dummy_variables(rawText)
-    isProfessor2, department_textual, department_keyword  = populate_department_variables(rawText)
-    return  (*flags, isProfessor2, department_textual, department_keyword)
+    isProfessor2, department_textual, department_keyword, keyword_precision  = populate_department_variables(rawText)
+    return  (*flags, isProfessor2, department_textual, department_keyword, keyword_precision)
 
 def populate_dummy_variables(rawText: list[str]) -> str:
     if rawText is None:
@@ -96,9 +98,9 @@ def populate_department_variables(rawText):
         return isProfessor2, department_textual, department_keyword
     
     department_textual, isProfessor2 = _extract_department_regex(rawText)
-    department_keyword = _extract_department_fuzzy_match(rawText)
+    department_keyword, keyword_precision = _extract_department_fuzzy_match(rawText)
 
-    return isProfessor2, department_textual, department_keyword
+    return isProfessor2, department_textual, department_keyword, keyword_precision
 
 def _extract_department_regex(rawText):
     # Try primary patterns first
@@ -133,10 +135,12 @@ def _load_department_names(file_path):
 def _extract_department_fuzzy_match(rawText):
     DEPARTMENT_WHITELIST = _load_department_names("storage/department-whitelist.pkl")
 
-    for text in rawText:
-        for department in DEPARTMENT_WHITELIST:
-            if department in text.lower(): return department
-    return "MISSING"
+    for i in range(1, 4):
+        for text in rawText:
+            for department in DEPARTMENT_WHITELIST[i]:
+                if department in text.lower(): return department, i
+
+    return "MISSING", 0
 
 def _count_teaching_intensity(text: str) -> int:
     """Counts the number of times the word teach appears in the text using regex."""
