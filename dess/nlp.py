@@ -8,13 +8,15 @@ import pickle
 # criteria associated with dummy variables
 CRITERIA_FLAGS = {
     'isProfessor': ["professor", "faculty"],
-    'isInstructor': ["instructor", "educator", "adjunct", "lecturer", "professor of teaching"],
-    'isEmeritus': ["emiritus", "emerita"],
+    'isInstructor': ["instructor", "educator", "adjunct", "lecturer", "teacher"],
+    'isEmeritus': ["emeritus", "emerita", "emiritus", "emirita"],
     'isAssistantProf': ["assistant"],
     'isAssociateProf': ["associate"],
     'isFullProf': ["full"],
     'isClinicalProf': ["clinical"],
-    'isResearcher': ["research", "citations", "examine", "investigate"]
+    'isResearcher': ["research", "citations", "examine", "investigate"],
+    'isRetired': ["emiritus", "emerita", "retired", "passed away", "memorial", "obituary", 
+                  "death", "tribute", "funeral", "condolences"],
 }
 
 # Patterns to match department names, ordered by priority
@@ -53,7 +55,8 @@ DEPARTMENT_PATTERNS = {
 
 # Words to ignore if this is the department that's extracted — minimize false positives
 IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','university','adjunct',
-                'school','senior','college','emeritus', 'degree', 'current', 'phone', 'faculty', 'dept', 'in']
+                'school','senior','college','emeritus', 'degree', 'current', 'phone', 'faculty', 
+                'dept', 'in', 'research', 'professor', 'specialty']
 
 # Path to the file containing the whitelist of keywords for department extraction
 KEYWORD_WHITELIST_FILE_PATH = "storage/department-whitelist.pkl"
@@ -62,7 +65,7 @@ KEYWORD_WHITELIST_FILE_PATH = "storage/department-whitelist.pkl"
 def extract_department_information(df: pd.DataFrame):
     """Populates the isFaculty and department columns in the DataFrame."""
     df[['isProfessor', 'isInstructor', 'isEmeritus', 'isAssistantProf', 'isAssociateProf', 
-        'isFullProf', 'isClinicalProf', 'isResearcher', 'teaching_intensity', 'department_textual',
+        'isFullProf', 'isClinicalProf', 'isResearcher', 'isRetired', 'teaching_intensity', 'department_textual',
         'isPrimaryPattern', 'department_keyword', 'keyword_precision']] =  df.apply(
         lambda row: populate_faculty_columns(row['rawText']),
         axis=1,
