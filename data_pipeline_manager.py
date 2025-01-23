@@ -183,9 +183,15 @@ def import_files_from_dropbox(client=None):
             print(f"Downloading {file.path_lower}")
             dbx.files_download_to_file(os.path.join(STORAGE_DIR, file.name), file.path_lower)
 
-def generate_sample_output_file(filename='sample.xlsx', n_samples=200):
-    """Reads the complete Parquet file, randomly samples n_samples rows, and writes to an Excel file."""
+def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsProfessor=False):
+    """Reads the complete Parquet file, randomly samples n_samples rows, and writes to an Excel file.
+    If onlyIsProfessor is True, samples only from rows where isProfessor is True.
+    """
     df = pd.read_parquet(f"{STORAGE_DIR}/complete.parquet")
+    
+    if onlyIsProfessor:
+        df = df[df['isProfessor'] == True]
+    
     sample_df = df.sample(n=n_samples)
     sample_df.to_excel(os.path.join(STORAGE_DIR, filename), index=False)
     print(f"Successfully generated {filename} with {n_samples} samples.")
