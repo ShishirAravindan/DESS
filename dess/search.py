@@ -54,11 +54,11 @@ def _create_firefox_driver():
     options = FireFoxOptions()
     options.set_preference("dom.popup_maximum", 0)
     options.set_preference("privacy.popups.disable_from_plugins", 3)
-    options.add_argument("--headless")
+    # options.add_argument("--headless")
     driver = webdriver.Firefox(options=options)
     return driver
 
-def get_snapshots_from_google(driver: webdriver, search_query:str, snapshots:int):
+def get_snapshots_from_google(driver: webdriver, search_query:str, snapshots:int, count):
     """
     Performs a Google search for the given name and university, and retrieves specified snapshots of the search results.
 
@@ -76,7 +76,7 @@ def get_snapshots_from_google(driver: webdriver, search_query:str, snapshots:int
     google_url = f"https://www.google.com/search?q={search_query.replace(' ', '+')}"
     driver.get(google_url)
 
-    time.sleep(2)  
+    if count == 1: time.sleep(12)
 
     # Find the first snapshot search results
     try:
@@ -140,7 +140,7 @@ def populate_raw_text(df: pd.DataFrame, driver, snapshots: int) -> pd.Series:
         count += 1
         print(f"\t row #{count}")
        
-        return get_snapshots_from_google(driver, row['id_text'], snapshots)
+        return get_snapshots_from_google(driver, row['id_text'], snapshots, count)
     return df.apply(fetch_raw_text, axis=1)
 
 def search(df: pd.DataFrame, driver_type: str, snapshots: int):
@@ -166,7 +166,7 @@ def main(start_index: int):
     else:
         print("FILE NOT FOUND")
         return
-    
+    df['rawText'] = pd.Series(dtype=str)
     # Start the processing-and-caching process
     print(f"PROCESSING: Started from index {start_index}")
     start = time.time()
@@ -198,8 +198,3 @@ if __name__ == '__main__':
     parser.add_argument("start_index", type=int, help="The index to start processing from")
     args = parser.parse_args()
     main(args.start_index)
-
-    
-
-    
-    
