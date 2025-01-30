@@ -7,12 +7,11 @@ The DESS tool processes a file containing faculty names and their respective uni
 DESS/                               # Root directory
 ├── README.md                       # Project documentation
 ├── data_pipeline_manager.py        # Module for handling Dropbox interactions
-├── workflow.ipynd                  # Entry point for running DESS
-│
+├── workflow.ipynb                  # Entry point for running DESS
 ├── dess/                            # Core application folder
 │   ├── nlp.py                       # Module for extracting departments
 │   └── search.py                    # Module for performing Google searches
-│
+├── stats.py        
 ├── requirements.txt                 # Python dependencies
 ├── .env                             # Environment variables (e.g., Dropbox API keys)
 ```
