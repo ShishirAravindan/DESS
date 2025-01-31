@@ -17,8 +17,9 @@ import time
 import os
 import argparse
 
-LOCAL_PARQUET_PATH = '../storage/uncomplete_random_scraper_test.parquet'
+LOCAL_PARQUET_PATH = '../storage/scrapertesting.parquet'
 CHUNK_SIZE = 200
+counter = 0 
 
 def setup_driver(driver_type: str) -> webdriver:
     """Sets up the web driver based on the specified type."""
@@ -54,7 +55,9 @@ def _create_firefox_driver():
     options = FireFoxOptions()
     options.set_preference("dom.popup_maximum", 0)
     options.set_preference("privacy.popups.disable_from_plugins", 3)
-    options.add_argument("--headless")
+    # global counter
+    # if counter !=0 or counter!=1:
+    #     options.add_argument("--headless")
     driver = webdriver.Firefox(options=options)
     return driver
 
@@ -73,6 +76,14 @@ def get_snapshots_from_google(driver: webdriver, search_query:str, snapshots:int
     Raises:
         Exception: Raises an exception if there is an error during the search or result retrieval.
     """
+    # if global counter==0:
+    #     time.sleep(15)
+    #     counter+=1
+    global counter
+    if counter == 0 or counter==1:
+        time.sleep(15)
+        counter+=1
+    
     google_url = f"https://www.google.com/search?q={search_query.replace(' ', '+')}"
     driver.get(google_url)
 
@@ -166,7 +177,7 @@ def main(start_index: int):
     else:
         print("FILE NOT FOUND")
         return
-    
+    df['rawText'] = None
     # Start the processing-and-caching process
     print(f"PROCESSING: Started from index {start_index}")
     start = time.time()
