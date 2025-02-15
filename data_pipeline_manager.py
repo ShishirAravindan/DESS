@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+from tqdm import tqdm
 import dropbox
 from dropbox import DropboxOAuth2FlowNoRedirect
 
@@ -199,3 +200,48 @@ def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsPro
     sample_df = df.sample(n=n_samples)
     sample_df.to_excel(os.path.join(STORAGE_DIR, filename), index=False)
     print(f"Successfully generated {filename} with {n_samples} samples.")
+
+def push_new_dataset_files_to_dropbox(client):
+    """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
+    
+    # Setup dropbox client
+    if client:
+        dbx = client
+    else:
+        access_token = os.getenv("DROPBOX_ACCESS_TOKEN")
+        # Read & download files from Dropbox
+        dbx = dropbox.Dropbox(access_token)
+
+    # Define Dropbox folder and local cache path
+    dropbox_folder = os.getenv("DROPBOX_FOLDER")
+    local_cache_path = "storage/dataset"
+
+    # Check for CSV files in the local cache
+    csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
+    if not csv_files:
+        print("No CSV files found in the local cache!")
+        return
+    
+    # Upload all CSV files from local cache with progress bar
+    with tqdm(total=len(csv_files), desc="Uploading CSVs", unit="file") as pbar:
+        for file_name in csv_files:
+            local_file_path = os.path.join(local_cache_path, file_name)
+            safe_file_name = file_name.replace(" ", "_")
+            dropbox_file_path = os.path.join(dropbox_folder, "dataset", safe_file_name)
+
+            with open(local_file_path, "rb") as f:
+                dbx.files_upload(f.read(), dropbox_file_path, mode=dropbox.files.WriteMode("add"))
+            
+            # Update progress bar after each successful upload
+            pbar.set_postfix(file=file_name)
+            pbar.update(1)
+
+
+    print("Upload complete! Cleaning up local cache...")
+
+    # clean up local cahce once upload finishes
+    for file_name in csv_files:
+        local_file_path = os.path.join(local_cache_path, file_name)
+        os.remove(local_file_path)
+
+    print("Sync Complete!")
