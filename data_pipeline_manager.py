@@ -260,7 +260,10 @@ def update_stata_file(df: pd.DataFrame, stata_file_path: str):
     # Ensure id_text is string type in both DataFrames
     stata_df['id_text'] = stata_df['id_text'].astype(str)
     df['id_text'] = df['id_text'].astype(str)
+    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[rawText for rawText in df['rawText'] if len(rawText) == 4])
     
+    df = df.drop(columns='rawText')
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(zip(snippet_1, snippet_2, snippet_3, snippet_4))
     # Create a mapping of id_text to row updates
     update_dict = df.set_index('id_text').to_dict('index')
     

@@ -21,7 +21,6 @@ def _build_payload(search_query,date_restrict):
 def make_API_CALL(search_query,date_restrict):
     response = requests.get(BASE_URL, params=_build_payload(search_query,date_restrict))
     results = response.json()
-    print(results)
     # Save results to a CSV file
     df_results = pd.json_normalize(results.get('items', []))
     # print(df_results)  # Normalize the JSON response
@@ -29,11 +28,18 @@ def make_API_CALL(search_query,date_restrict):
     file_name = '_'.join(search_query.split(" "))
     df_results.to_csv(f"storage/csv_datasets/{file_name}.csv", index=False)
     return f"storage/csv_datasets/{file_name}.csv"
-
+def replace_escaped_quotes(input_string): 
+    # Replace escaped single quotes and double quotes 
+    # Replaces \' with a backtick 
+    input_string = input_string.replace(r"\xa0", " ") 
+    return input_string
+    # Replaces \" with a single quote return input_string
 def _get_rawText(filePath):
     try:
         df = pd.read_csv(filePath)
         if 'title' and 'snippet' in df.columns:
+            df['title']=df['title'].apply(replace_escaped_quotes)
+            df['snippet']=df['snippet'].apply(replace_escaped_quotes)
             rawText = (df['title'] + ' ' + df['snippet']).tolist()[:4]
         else:
             rawText = None
@@ -53,7 +59,7 @@ def populate_rawText_col(df):
         if raw_text is None:
             print("Error while generating csv from google search for "+id_text)
         raw_texts.append(raw_text)
-        os.remove(file_name)
+        # os.remove(file_name)
     df['rawText']=raw_texts
     # df['rawText']=df['rawText'].apply(ast.literal_eval)
     return df
