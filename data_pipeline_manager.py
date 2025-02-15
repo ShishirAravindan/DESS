@@ -245,3 +245,35 @@ def push_new_dataset_files_to_dropbox(client):
         os.remove(local_file_path)
 
     print("Sync Complete!")
+
+def update_stata_file(df: pd.DataFrame, stata_file_path: str):
+    """
+    Updates a Stata file with information from the provided DataFrame, matching on id_text.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing the new information
+        stata_file_path (str): Path to the Stata file to be updated
+    """
+    # Read the existing Stata file
+    stata_df = pd.read_stata(stata_file_path)
+    
+    # Ensure id_text is string type in both DataFrames
+    stata_df['id_text'] = stata_df['id_text'].astype(str)
+    df['id_text'] = df['id_text'].astype(str)
+    
+    # Create a mapping of id_text to row updates
+    update_dict = df.set_index('id_text').to_dict('index')
+    
+    # Update matching rows
+    for idx, row in stata_df.iterrows():
+        if row['id_text'] in update_dict:
+            for col, value in update_dict[row['id_text']].items():
+                if col in stata_df.columns:  # Update if column exists
+                    stata_df.at[idx, col] = value
+                else:  # Add new column if it doesn't exist
+                    stata_df[col] = None  # Initialize new column with None
+                    stata_df.at[idx, col] = value  # Set the value for the new column
+    
+    # Save the updated DataFrame back to Stata format
+    stata_df.to_stata(stata_file_path, version=118)
+    
