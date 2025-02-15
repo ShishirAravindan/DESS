@@ -159,13 +159,17 @@ def _upload_file_to_dropbox(client, file_path, overwrite=False):
     except Exception as e:
         print(f"Error uploading {file_name} to Dropbox: {e}")
     
-def create_stata_output_file(file_name: str="complete.dta"):
-    """Reads the complete Parquet file and does some post-processing to ensure stata conversion is optimized."""
-    df = pd.read_parquet(f"{STORAGE_DIR}/complete.parquet")
+def create_stata_output_file(df,file_name):
+    """Reads the dataframe and does some post-processing to ensure stata conversion is optimized."""
+    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[rawText for rawText in df['rawText'] if len(rawText) == 4])
+    
     df = df.drop(columns='rawText')
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(zip(snippet_1, snippet_2, snippet_3, snippet_4))
+    
     stata_file_path = os.path.join(STORAGE_DIR, file_name)
     df.to_stata(stata_file_path, version=118)
     print(f"Successfully generated {stata_file_path}")
+    return df
 
 def import_files_from_dropbox(client=None):
     """Imports files from Dropbox into the storage directory."""
