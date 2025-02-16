@@ -252,9 +252,9 @@ def push_new_dataset_files_to_dropbox(dbx):
             pbar.update(1)
 
     # Upload [updating] Stata file without deleting it
-    stata_files = [f for f in os.listdir(local_cache_path) if f.endswith('.dta')]
+    stata_files = [f for f in os.listdir(STORAGE_DIR) if f.endswith('.dta')]
     for stata_file_name in stata_files:
-        stata_file_path = os.path.join(local_cache_path, stata_file_name)
+        stata_file_path = os.path.join(STORAGE_DIR, stata_file_name)
         dropbox_stata_file_path = os.path.join(dropbox_folder, 'dataset', stata_file_name)
 
         upload_large_file(dbx, stata_file_path, dropbox_stata_file_path)
