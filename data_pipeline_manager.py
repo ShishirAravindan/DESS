@@ -4,7 +4,7 @@ import numpy as np
 from dotenv import load_dotenv
 from tqdm import tqdm
 import dropbox
-from dropbox import DropboxOAuth2FlowNoRedirect
+from dropbox.files import WriteMode
 
 load_dotenv()
 
@@ -94,24 +94,21 @@ def _safe_merge(df_master: pd.DataFrame, df: pd.DataFrame, col_name: str = 'id_t
     return df_combined, conflicts
 
 def dropbox_oauth():
-    auth_flow = DropboxOAuth2FlowNoRedirect(os.getenv("DROPBOX_APP_KEY"), os.getenv("DROPBOX_APP_SECRET"))
-
-    authorize_url = auth_flow.start()
-    print("1. Go to: " + authorize_url)
-    print("2. Click \"Allow\" (you might have to log in first).")
-    print("3. Copy the authorization code.")
-    auth_code = input("Enter the authorization code here: ").strip()
-
+    """Create Dropbox client using refresh token stored in environment"""
     try:
-        oauth_result = auth_flow.finish(auth_code)
-    except Exception as e:
-        print('Error: %s' % (e,))
-        exit(1)
-
-    with dropbox.Dropbox(oauth2_access_token=oauth_result.access_token) as dbx:
+        dbx = dropbox.Dropbox(
+            app_key=os.getenv("DROPBOX_APP_KEY"),
+            app_secret=os.getenv("DROPBOX_APP_SECRET"),
+            oauth2_refresh_token=os.getenv("DROPBOX_REFRESH_TOKEN")
+        )
+        
+        # Test the connection
         dbx.users_get_current_account()
-        print("Successfully set up client!")
         return dbx
+        
+    except Exception as e:
+        print(f'Error creating Dropbox client: {e}')
+        raise
 
 def orchestrate_upload_workflow(overwrite=False, client=None):
     for file_name in os.listdir(STORAGE_DIR):
@@ -154,7 +151,7 @@ def _upload_file_to_dropbox(client, file_path, overwrite=False):
 
     try:
         with open(file_path, 'rb') as f:
-            mode = dropbox.files.WriteMode.overwrite if overwrite else dropbox.files.WriteMode.add
+            mode = WriteMode.overwrite if overwrite else WriteMode.add
             dbx.files_upload(f.read(), upload_path, mode=mode)
         print(f"\tSuccessfully uploaded {file_name} to {upload_path}")
     except Exception as e:
@@ -201,17 +198,36 @@ def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsPro
     sample_df.to_excel(os.path.join(STORAGE_DIR, filename), index=False)
     print(f"Successfully generated {filename} with {n_samples} samples.")
 
-def push_new_dataset_files_to_dropbox(client):
-    """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
-    
-    # Setup dropbox client
-    if client:
-        dbx = client
-    else:
-        access_token = os.getenv("DROPBOX_ACCESS_TOKEN")
-        # Read & download files from Dropbox
-        dbx = dropbox.Dropbox(access_token)
+def upload_large_file(dbx, stata_file_path, dropbox_stata_file_path):
+    CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
+    file_size = os.path.getsize(stata_file_path)
 
+    with open(stata_file_path, "rb") as f:
+        if file_size <= CHUNK_SIZE:
+            # If the file is small enough, upload it directly
+            dbx.files_upload(f.read(), dropbox_stata_file_path, mode=WriteMode.overwrite)
+        else:
+            # Chunked upload
+            upload_session_start_result = dbx.files_upload_session_start(f.read(CHUNK_SIZE))
+            session_id = upload_session_start_result.session_id
+            cursor = dropbox.files.UploadSessionCursor(session_id=session_id, offset=f.tell())
+            commit = dropbox.files.CommitInfo(path=dropbox_stata_file_path)
+
+            # Initialize progress bar
+            with tqdm(total=file_size, unit='B', unit_scale=True, desc="Uploading") as pbar:
+                pbar.update(CHUNK_SIZE)  # Update for the first chunk
+
+                while f.tell() < file_size:
+                    if (file_size - f.tell()) <= CHUNK_SIZE:
+                        dbx.files_upload_session_finish(f.read(CHUNK_SIZE), cursor, commit)
+                    else:
+                        dbx.files_upload_session_append(f.read(CHUNK_SIZE), cursor.session_id, cursor.offset)
+                        cursor.offset = f.tell()
+                    
+                    pbar.update(CHUNK_SIZE)  # Update progress bar after each chunk
+
+def push_new_dataset_files_to_dropbox(dbx):
+    """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
     # Define Dropbox folder and local cache path
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
     local_cache_path = "storage/dataset"
@@ -220,7 +236,6 @@ def push_new_dataset_files_to_dropbox(client):
     csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
     if not csv_files:
         print("No CSV files found in the local cache!")
-        return
     
     # Upload all CSV files from local cache with progress bar
     with tqdm(total=len(csv_files), desc="Uploading CSVs", unit="file") as pbar:
@@ -230,16 +245,23 @@ def push_new_dataset_files_to_dropbox(client):
             dropbox_file_path = os.path.join(dropbox_folder, "dataset", safe_file_name)
 
             with open(local_file_path, "rb") as f:
-                dbx.files_upload(f.read(), dropbox_file_path, mode=dropbox.files.WriteMode("add"))
+                dbx.files_upload(f.read(), dropbox_file_path, mode=WriteMode.add)
             
             # Update progress bar after each successful upload
             pbar.set_postfix(file=file_name)
             pbar.update(1)
 
+    # Upload [updating] Stata file without deleting it
+    stata_files = [f for f in os.listdir(local_cache_path) if f.endswith('.dta')]
+    for stata_file_name in stata_files:
+        stata_file_path = os.path.join(local_cache_path, stata_file_name)
+        dropbox_stata_file_path = os.path.join(dropbox_folder, 'dataset', stata_file_name)
 
-    print("Upload complete! Cleaning up local cache...")
+        upload_large_file(dbx, stata_file_path, dropbox_stata_file_path)
 
-    # clean up local cahce once upload finishes
+    print("Upload complete! Removing local CSV files...")
+
+    # clean up local cache once upload finishes
     for file_name in csv_files:
         local_file_path = os.path.join(local_cache_path, file_name)
         os.remove(local_file_path)
@@ -278,5 +300,4 @@ def update_stata_file(df: pd.DataFrame, stata_file_path: str):
                     stata_df.at[idx, col] = value  # Set the value for the new column
     
     # Save the updated DataFrame back to Stata format
-    stata_df.to_stata(stata_file_path, version=118)
-    
+    stata_df.to_stata(stata_file_path, version=118, write_index=False)
