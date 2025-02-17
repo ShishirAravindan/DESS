@@ -211,7 +211,7 @@ def upload_large_file(dbx, file_path, dropbox_file_path):
             upload_session_start_result = dbx.files_upload_session_start(f.read(CHUNK_SIZE))
             session_id = upload_session_start_result.session_id
             cursor = dropbox.files.UploadSessionCursor(session_id=session_id, offset=f.tell())
-            commit = dropbox.files.CommitInfo(path=dropbox_file_path)
+            commit = dropbox.files.CommitInfo(path=dropbox_file_path, mode=WriteMode.overwrite)
 
             # Initialize progress bar
             with tqdm(total=file_size, unit='B', unit_scale=True, desc="Uploading") as pbar:
@@ -253,9 +253,11 @@ def push_new_dataset_files_to_dropbox(dbx):
 
     # Upload [updating] parquet file without deleting it
     parquet_files = [f for f in os.listdir(local_cache_path) if f.endswith('.parquet')]
-    for stata_file_name in parquet_files:
-        file_path = os.path.join(local_cache_path, stata_file_name)
-        dropbox_file_path = os.path.join(dropbox_folder, 'dataset', stata_file_name)
+    for parquet_file_name in parquet_files:
+        file_path = os.path.join(local_cache_path, parquet_file_name)
+        dropbox_file_path = os.path.join(dropbox_folder, 'dataset', parquet_file_name)
+
+        print(file_path, dropbox_file_path)
 
         upload_large_file(dbx, file_path, dropbox_file_path)
 
