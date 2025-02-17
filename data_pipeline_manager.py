@@ -179,11 +179,11 @@ def import_files_from_dropbox(client=None):
         dbx = dropbox.Dropbox(access_token)
     
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    files = dbx.files_list_folder(f'/{dropbox_folder}/')
+    files = dbx.files_list_folder(f'/{dropbox_folder}/dataset/')
     for file in files.entries:
         if file.name.endswith('.parquet'):
             print(f"Downloading {file.path_lower}")
-            dbx.files_download_to_file(os.path.join(STORAGE_DIR, file.name), file.path_lower)
+            dbx.files_download_to_file(os.path.join(STORAGE_DIR, 'dataset', file.name), file.path_lower)
 
 def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsProfessor=False):
     """Reads the complete Parquet file, randomly samples n_samples rows, and writes to an Excel file.
@@ -198,20 +198,20 @@ def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsPro
     sample_df.to_excel(os.path.join(STORAGE_DIR, filename), index=False)
     print(f"Successfully generated {filename} with {n_samples} samples.")
 
-def upload_large_file(dbx, stata_file_path, dropbox_stata_file_path):
+def upload_large_file(dbx, file_path, dropbox_file_path):
     CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
-    file_size = os.path.getsize(stata_file_path)
+    file_size = os.path.getsize(file_path)
 
-    with open(stata_file_path, "rb") as f:
+    with open(file_path, "rb") as f:
         if file_size <= CHUNK_SIZE:
             # If the file is small enough, upload it directly
-            dbx.files_upload(f.read(), dropbox_stata_file_path, mode=WriteMode.overwrite)
+            dbx.files_upload(f.read(), dropbox_file_path, mode=WriteMode.overwrite)
         else:
             # Chunked upload
             upload_session_start_result = dbx.files_upload_session_start(f.read(CHUNK_SIZE))
             session_id = upload_session_start_result.session_id
             cursor = dropbox.files.UploadSessionCursor(session_id=session_id, offset=f.tell())
-            commit = dropbox.files.CommitInfo(path=dropbox_stata_file_path)
+            commit = dropbox.files.CommitInfo(path=dropbox_file_path)
 
             # Initialize progress bar
             with tqdm(total=file_size, unit='B', unit_scale=True, desc="Uploading") as pbar:
@@ -251,13 +251,13 @@ def push_new_dataset_files_to_dropbox(dbx):
             pbar.set_postfix(file=file_name)
             pbar.update(1)
 
-    # Upload [updating] Stata file without deleting it
-    stata_files = [f for f in os.listdir(local_cache_path) if f.endswith('.dta')]
-    for stata_file_name in stata_files:
-        stata_file_path = os.path.join(local_cache_path, stata_file_name)
-        dropbox_stata_file_path = os.path.join(dropbox_folder, 'dataset', stata_file_name)
+    # Upload [updating] parquet file without deleting it
+    parquet_files = [f for f in os.listdir(local_cache_path) if f.endswith('.parquet')]
+    for stata_file_name in parquet_files:
+        file_path = os.path.join(local_cache_path, stata_file_name)
+        dropbox_file_path = os.path.join(dropbox_folder, 'dataset', stata_file_name)
 
-        upload_large_file(dbx, stata_file_path, dropbox_stata_file_path)
+        upload_large_file(dbx, file_path, dropbox_file_path)
 
     print("Upload complete! Removing local CSV files...")
 
