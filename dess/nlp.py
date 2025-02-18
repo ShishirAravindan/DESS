@@ -172,3 +172,9 @@ def _lookup_criteria(text: str, criteria: list[str]) -> bool:
         if criterion in text.lower():
             return True
     return False
+
+if __name__ == "__main__":
+    df_recent = pd.read_excel('storage/googleApiSearch_test_recent.xlsx')
+    df_recent=df_recent.drop(columns='Unnamed: 0')
+    df_recent = df_recent.dropna(subset=['rawText'])
+    extract_department_information(df_recent)

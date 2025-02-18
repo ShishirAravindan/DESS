@@ -39,7 +39,7 @@ def get_chunk_processing_stats(df: pd.DataFrame, CHUNK_SIZE=200):
     return "COMPLETE"
 
 def get_dataset_stats(file_path:str):
-    df = pd.read_parquet(file_path)
+    df = pd.read_excel(file_path)
     
     total_records = len(df)
     df_isProfessor = df[df['isProfessor'] == True]
