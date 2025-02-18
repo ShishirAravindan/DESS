@@ -5,7 +5,7 @@ from data_pipeline_manager import import_files_from_dropbox, dropbox_oauth, uplo
 
 LOCAL_DATASET_DIR = "storage/dataset"
 DROPBOX_DATASET_DIR = os.path.join(os.getenv("DROPBOX_FOLDER"), 'dataset')
-OUTPUT_FILE_NAME = "merged_data.dta"
+OUTPUT_FILE_NAME = "toSearch-2025-02-11-inProgress.dta"
 
 def _convert_boolean_columns(df):
     """Convert boolean columns to int8 (0/1)."""
@@ -21,18 +21,6 @@ def _convert_boolean_columns(df):
 def _convert_float_columns(df):
     """Convert float32 columns to float64 (Stata's double)."""
     df['professor'] = df['professor'].astype('float64')
-    return df
-
-def _process_raw_text(df):
-    """Process rawText column into separate snippet columns."""
-    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[
-        rawText for rawText in df['rawText'] if len(rawText) == 4
-    ])
-    
-    df = df.drop(columns='rawText')
-    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(
-        zip(snippet_1, snippet_2, snippet_3, snippet_4)
-    )
     return df
 
 def _process_string_columns(df):
@@ -70,7 +58,6 @@ def convert_to_stata(df):
     
     df_stata = _convert_boolean_columns(df_stata)
     df_stata = _convert_float_columns(df_stata)
-    df_stata = _process_raw_text(df_stata)
     df_stata = _process_string_columns(df_stata)
     
     return save_to_stata(df_stata)
@@ -93,8 +80,7 @@ def main():
 
     # Step 2: Merge parquet files
     merged_df = merge_parquet_files()
-
-    nlp.extract_department_information(merged_df)
+    merged_df = merged_df.dropna(subset=['snippet_1'])
 
     # Step 3: Convert to Stata format
     stata_file_path = convert_to_stata(merged_df)
