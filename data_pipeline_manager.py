@@ -9,6 +9,7 @@ from dropbox.files import WriteMode
 load_dotenv()
 
 STORAGE_DIR = "storage/"
+PARQUET_FILE_NAME = "shishir-toSearch-2025-02-11.parquet"
 
 def get_new_rows():
     """Reads the master (stata) dataset and returns new rows not present in 'complete' or 'reprocess' files."""
@@ -252,14 +253,10 @@ def push_new_dataset_files_to_dropbox(dbx):
             pbar.update(1)
 
     # Upload [updating] parquet file without deleting it
-    parquet_files = [f for f in os.listdir(local_cache_path) if f.endswith('.parquet')]
-    for parquet_file_name in parquet_files:
-        file_path = os.path.join(local_cache_path, parquet_file_name)
-        dropbox_file_path = os.path.join(dropbox_folder, 'dataset', parquet_file_name)
+    file_path = os.path.join(STORAGE_DIR, 'dataset', PARQUET_FILE_NAME)
+    dropbox_file_path = os.path.join(dropbox_folder, 'dataset', PARQUET_FILE_NAME)
 
-        print(file_path, dropbox_file_path)
-
-        upload_large_file(dbx, file_path, dropbox_file_path)
+    upload_large_file(dbx, file_path, dropbox_file_path)
 
     print("Upload complete! Removing local CSV files...")
 
