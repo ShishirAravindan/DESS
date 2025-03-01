@@ -8,7 +8,7 @@ from dropbox.files import WriteMode
 
 load_dotenv()
 
-STORAGE_DIR = "storage/"
+STORAGE_DIR = os.getenv("STORAGE_DIR")
 PARQUET_FILE_NAME = "shishir-toSearch-2025-02-11.parquet"
 
 def get_new_rows():
@@ -231,7 +231,7 @@ def push_new_dataset_files_to_dropbox(dbx):
     """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
     # Define Dropbox folder and local cache path
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    local_cache_path = "storage/dataset"
+    local_cache_path = f"{STORAGE_DIR}/dataset"
 
     # Check for CSV files in the local cache
     csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
@@ -281,10 +281,11 @@ def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
     # Ensure id_text is string type in both DataFrames
     parquet_df['id_text'] = parquet_df['id_text'].astype(str)
     df['id_text'] = df['id_text'].astype(str)
-    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[rawText for rawText in df['rawText'] if len(rawText) == 4])
     
+    # Convert rawText lists directly to snippet columns
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = pd.DataFrame(df['rawText'].tolist(), index=df.index)
     df = df.drop(columns='rawText')
-    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(zip(snippet_1, snippet_2, snippet_3, snippet_4))
+    
     # Create a mapping of id_text to row updates
     update_dict = df.set_index('id_text').to_dict('index')
     

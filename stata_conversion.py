@@ -1,11 +1,22 @@
 import os
 import pandas as pd
-import dess.nlp as nlp
+import logging
+from dotenv import load_dotenv
 from data_pipeline_manager import import_files_from_dropbox, dropbox_oauth, upload_large_file
 
-LOCAL_DATASET_DIR = "storage/dataset"
+# ========================================
+# CONFIG
+load_dotenv()
+STORAGE_DIR = os.getenv("STORAGE_DIR")
+LOCAL_DATASET_DIR = f"{STORAGE_DIR}/dataset"
 DROPBOX_DATASET_DIR = os.path.join(os.getenv("DROPBOX_FOLDER"), 'dataset')
 OUTPUT_FILE_NAME = "toSearch-2025-02-11-inProgress.dta"
+LOG_FILE = f'{STORAGE_DIR}/API_WORKFLOW_shishir.LOG'
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    force=True)
+logger = logging.getLogger(__name__)
+# ========================================
 
 def _convert_boolean_columns(df):
     """Convert boolean columns to int8 (0/1)."""
@@ -74,21 +85,22 @@ def save_to_stata(df):
     
 def main():
     """Main function to orchestrate the conversion process."""
+    logger.info("[Stata conversion] Starting Stata conversion sync")
     dbx = dropbox_oauth()
     # Step 1: Import files from Dropbox
     import_files_from_dropbox(dbx)
 
     # Step 2: Merge parquet files
     merged_df = merge_parquet_files()
-    merged_df = merged_df.dropna(subset=['snippet_1'])
+    merged_df = merged_df.dropna(subset=['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4'])
 
     # Step 3: Convert to Stata format
     stata_file_path = convert_to_stata(merged_df)
-    print(stata_file_path)
 
     # Step 4: Upload the Stata file to Dropbox
     DROPBOX_UPLOAD_FILE_PATH = os.path.join(DROPBOX_DATASET_DIR, OUTPUT_FILE_NAME)
     upload_large_file(dbx, stata_file_path, DROPBOX_UPLOAD_FILE_PATH)
+    logger.info("[Stata conversion] Dataset file (.dta) uploaded successfully!")
 
 if __name__ == "__main__":
     main()

@@ -59,7 +59,7 @@ IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','un
                 'dept', 'in', 'research', 'professor', 'specialty']
 
 # Path to the file containing the whitelist of keywords for department extraction
-KEYWORD_WHITELIST_FILE_PATH = "storage/department-whitelist.pkl"
+KEYWORD_WHITELIST_FILE_PATH = "/Users/shishiraravindan/Documents/work-RA/dess/storage/department-whitelist.pkl"
 # ------------------------------------------------------------------------------
 
 def extract_department_information(df: pd.DataFrame):
@@ -79,7 +79,7 @@ def populate_faculty_columns(rawText: list[str]):
 
 def populate_dummy_variables(rawText: list[str]) -> str:
     if rawText is None:
-        return False, False, False, False, False, False, False, False, 0
+        return tuple([False] * len(CRITERIA_FLAGS)) + (0,)
 
     flags = {key: False for key in CRITERIA_FLAGS.keys()}
     teaching_intensity = 0

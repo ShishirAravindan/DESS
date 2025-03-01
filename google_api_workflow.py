@@ -9,17 +9,20 @@ import logging
 # ========================================
 # CONFIG
 load_dotenv()
-STORAGE_DIR = '/Users/shishiraravindan/Documents/work-RA/dess/storage'
+STORAGE_DIR = os.getenv('STORAGE_DIR')
 ERROR_FILE = f'{STORAGE_DIR}/errors.csv'
-LOG_FILE = f'{STORAGE_DIR}/API_WORKFLOW_shishir.LOG'
 FILE_PATH = f'{STORAGE_DIR}/dataset/shishir-toSearch-2025-02-11.parquet'
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+LOG_FILE = f'{STORAGE_DIR}/API_WORKFLOW_shishir.LOG'
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    force=True)
+logger = logging.getLogger(__name__)
 # ========================================
 
 def _get_next_chunk_for_api_call():
     df = pd.read_parquet(FILE_PATH)
     empty_df = df[df['snippet_1'].isna() | (df['snippet_1'] == '')]
-    rows_per_day = min(len(empty_df), 4)
+    rows_per_day = min(len(empty_df), 5)
     today_df = empty_df.iloc[:rows_per_day]
     return today_df
 
