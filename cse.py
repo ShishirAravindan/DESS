@@ -8,7 +8,7 @@ import csv
 load_dotenv()
 
 BASE_URL = "https://www.googleapis.com/customsearch/v1"
-DATASET_DIR = "storage/dataset"
+DATASET_DIR = "/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/"
 
 def _build_payload(search_query, date_restrict):
     """Constructs the payload for the Google Custom Search API request."""

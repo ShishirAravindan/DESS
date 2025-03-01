@@ -8,8 +8,8 @@ from dropbox.files import WriteMode
 
 load_dotenv()
 
-STORAGE_DIR = "storage/"
-PARQUET_FILE_NAME = "shishir-toSearch-2025-02-11.parquet"
+STORAGE_DIR = "/Users/akhil/Desktop/RA-Scraping/DESS/storage"
+PARQUET_FILE_NAME = "akhil-toSearch-2025-02-11.parquet"
 
 def get_new_rows():
     """Reads the master (stata) dataset and returns new rows not present in 'complete' or 'reprocess' files."""
@@ -231,7 +231,7 @@ def push_new_dataset_files_to_dropbox(dbx):
     """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
     # Define Dropbox folder and local cache path
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    local_cache_path = "storage/dataset"
+    local_cache_path = f'{STORAGE_DIR}/dataset/'
 
     # Check for CSV files in the local cache
     csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]

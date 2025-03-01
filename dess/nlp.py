@@ -59,7 +59,7 @@ IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','un
                 'dept', 'in', 'research', 'professor', 'specialty']
 
 # Path to the file containing the whitelist of keywords for department extraction
-KEYWORD_WHITELIST_FILE_PATH = "storage/department-whitelist.pkl"
+KEYWORD_WHITELIST_FILE_PATH = "/Users/akhil/Desktop/RA-Scraping/DESS/storage/department-whitelist.pkl"
 # ------------------------------------------------------------------------------
 
 def extract_department_information(df: pd.DataFrame):
