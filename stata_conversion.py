@@ -9,7 +9,7 @@ from data_pipeline_manager import import_files_from_dropbox, dropbox_oauth, uplo
 load_dotenv()
 STORAGE_DIR = os.getenv("STORAGE_DIR")
 LOCAL_DATASET_DIR = f"{STORAGE_DIR}/dataset"
-DROPBOX_DATASET_DIR = os.path.join(os.getenv("DROPBOX_FOLDER"), 'dataset')
+DROPBOX_DATA_FILES_DIR = os.path.join(os.getenv("DROPBOX_FOLDER"), 'data-files')
 OUTPUT_FILE_NAME = "toSearch-2025-02-11-inProgress.dta"
 LOG_FILE = f'{STORAGE_DIR}/API_WORKFLOW_shishir.LOG'
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, 
@@ -23,7 +23,7 @@ def _convert_boolean_columns(df):
     bool_columns = [
         'isProfessor', 'isInstructor', 'isEmeritus', 'isAssistantProf',
         'isAssociateProf', 'isFullProf', 'isClinicalProf', 'isResearcher',
-        'isRetired'
+        'isRetired', 'isProcessed'
     ]
     for col in bool_columns:
         df[col] = df[col].astype('int8')
@@ -98,7 +98,7 @@ def main():
     stata_file_path = convert_to_stata(merged_df)
 
     # Step 4: Upload the Stata file to Dropbox
-    DROPBOX_UPLOAD_FILE_PATH = os.path.join(DROPBOX_DATASET_DIR, OUTPUT_FILE_NAME)
+    DROPBOX_UPLOAD_FILE_PATH = os.path.join(DROPBOX_DATA_FILES_DIR, OUTPUT_FILE_NAME)
     upload_large_file(dbx, stata_file_path, DROPBOX_UPLOAD_FILE_PATH)
     logger.info("[Stata conversion] Dataset file (.dta) uploaded successfully!")
 

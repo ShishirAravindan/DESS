@@ -48,6 +48,11 @@ def _get_rawText(filePath):
     try:
         df = pd.read_csv(filePath, on_bad_lines='warn', encoding='utf-8')
         
+        # Check if DataFrame is empty
+        if df.empty:
+            logger.warning(f"CSV file {filePath} contains no data")
+            return None
+        
         if 'title' not in df.columns or 'snippet' not in df.columns:
             logger.warning(f"Missing required columns in {filePath}")
             return None
@@ -74,6 +79,9 @@ def populate_rawText_col(df):
         pd.DataFrame: DataFrame with populated 'rawText' column, None for any failures.
     """
     df['rawText'] = None
+
+    # Log only at the beginning of processing
+    logger.info(f"Starting to process {len(df)} rows for API calls")
 
     for index, row in df.iterrows():
         id_text = row['id_text']

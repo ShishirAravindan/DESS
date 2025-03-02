@@ -180,7 +180,7 @@ def import_files_from_dropbox(client=None):
         dbx = dropbox.Dropbox(access_token)
     
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    files = dbx.files_list_folder(f'/{dropbox_folder}/dataset/')
+    files = dbx.files_list_folder(f'/{dropbox_folder}/data-files/')
     for file in files.entries:
         if file.name.endswith('.parquet'):
             print(f"Downloading {file.path_lower}")
