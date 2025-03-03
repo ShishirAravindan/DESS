@@ -88,7 +88,7 @@ def populate_rawText_col(df):
         try:
             file_name = make_API_CALL(id_text)
             raw_text = _get_rawText(file_name)
-            df.at[index, 'rawText'] = raw_text if raw_text is not None else ["NaN"] 
+            df.at[index, 'rawText'] = raw_text
         except Exception as e:
             logger.error(f"Error processing row {index} ({id_text}): {e}")
 
@@ -97,4 +97,10 @@ def populate_rawText_col(df):
 if __name__=='__main__':
     search_query = 'Ngoyi Bukonda northern illinois university'
     make_API_CALL(search_query, "y15")
+    test_df = pd.DataFrame({
+        'id_text': ['Donald Kluemperjr louisiana state university and agricultural & mechanical college']
+    })
+    df2 = populate_rawText_col(test_df)
+    df_errors = df2[df2['rawText'].isna()]
+    df_errors[['id_text']].to_csv('errors.csv', mode='a', index=False)
         

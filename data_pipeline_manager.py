@@ -237,6 +237,7 @@ def push_new_dataset_files_to_dropbox(dbx):
     csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
     if not csv_files:
         print("No CSV files found in the local cache!")
+        return
     
     # Upload all CSV files from local cache with progress bar
     with tqdm(total=len(csv_files), desc="Uploading CSVs", unit="file") as pbar:
@@ -254,7 +255,7 @@ def push_new_dataset_files_to_dropbox(dbx):
 
     # Upload [updating] parquet file without deleting it
     file_path = os.path.join(STORAGE_DIR, 'dataset', PARQUET_FILE_NAME)
-    dropbox_file_path = os.path.join(dropbox_folder, 'dataset', PARQUET_FILE_NAME)
+    dropbox_file_path = os.path.join(dropbox_folder, 'data-files', PARQUET_FILE_NAME)
 
     upload_large_file(dbx, file_path, dropbox_file_path)
 
@@ -267,13 +268,14 @@ def push_new_dataset_files_to_dropbox(dbx):
 
     print("Sync Complete!")
 
-def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
+def update_parquet_file(df: pd.DataFrame, parquet_file_path: str, processed_ids):
     """
     Updates a Parquet file with information from the provided DataFrame, matching on id_text.
     
     Args:
         df (pd.DataFrame): DataFrame containing the new information
         parquet_file_path (str): Path to the Parquet file to be updated
+        processed_ids (list): List of id_text values to mark as processed
     """
     # Read the existing Parquet file
     parquet_df = pd.read_parquet(parquet_file_path)
@@ -298,6 +300,9 @@ def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
                 else:  # Add new column if it doesn't exist
                     parquet_df[col] = None  # Initialize new column with None
                     parquet_df.at[idx, col] = value  # Set the value for the new column
+    
+    # Mark rows as processed
+    parquet_df.loc[parquet_df['id_text'].isin(processed_ids), 'isProcessed'] = True
     
     # Save the updated DataFrame back to Parquet format
     parquet_df.to_parquet(parquet_file_path, index=False)
