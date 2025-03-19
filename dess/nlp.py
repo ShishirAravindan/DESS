@@ -1,9 +1,12 @@
 import re
 import pandas as pd
 import pickle
-
+import os
+from dotenv import load_dotenv
 # ------------------------------------------------------------------------------
 # Config
+
+load_dotenv()
 
 # criteria associated with dummy variables
 CRITERIA_FLAGS = {
@@ -59,7 +62,7 @@ IGNORE_TERMS = ['the', 'department','assistant','associate','full','special','un
                 'dept', 'in', 'research', 'professor', 'specialty']
 
 # Path to the file containing the whitelist of keywords for department extraction
-KEYWORD_WHITELIST_FILE_PATH = "/Users/shishiraravindan/Documents/work-RA/dess/storage/department-whitelist.pkl"
+KEYWORD_WHITELIST_FILE_PATH = f"{os.getenv('STORAGE_DIR')}/department-whitelist.pkl"
 # ------------------------------------------------------------------------------
 
 def extract_department_information(df: pd.DataFrame):

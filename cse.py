@@ -29,6 +29,7 @@ def make_API_CALL(search_query, date_restrict=None):
         results = response.json()
         df_results = pd.json_normalize(results.get('items', []))
         file_name = '_'.join(search_query.split(" "))
+        file_name = file_name.replace('/', '_').replace('\\', '_')
         df_results.to_csv(f"{DATASET_DIR}/{file_name}.csv", index=False, quoting=csv.QUOTE_ALL)
         
         return f"{DATASET_DIR}/{file_name}.csv"

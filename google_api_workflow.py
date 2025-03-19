@@ -24,7 +24,7 @@ def _get_next_chunk_for_api_call():
     unprocessed_df = df[df['isProcessed'] == False]
     
     # Limit rows per day based on rate limits
-    rows_per_day = min(len(unprocessed_df), 200)
+    rows_per_day = min(len(unprocessed_df), 100)
     today_df = unprocessed_df.iloc[:rows_per_day]
     
     logging.info(f"Selected {len(today_df)} rows for processing")
