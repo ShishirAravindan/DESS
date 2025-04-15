@@ -2,12 +2,14 @@ import os
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+from tqdm import tqdm
 import dropbox
-from dropbox import DropboxOAuth2FlowNoRedirect
+from dropbox.files import WriteMode
 
 load_dotenv()
 
-STORAGE_DIR = "storage/"
+STORAGE_DIR = os.getenv("STORAGE_DIR")
+PARQUET_FILE_NAME = "shishir-toSearch-2025-02-11.parquet"
 
 def get_new_rows():
     """Reads the master (stata) dataset and returns new rows not present in 'complete' or 'reprocess' files."""
@@ -93,24 +95,21 @@ def _safe_merge(df_master: pd.DataFrame, df: pd.DataFrame, col_name: str = 'id_t
     return df_combined, conflicts
 
 def dropbox_oauth():
-    auth_flow = DropboxOAuth2FlowNoRedirect(os.getenv("DROPBOX_APP_KEY"), os.getenv("DROPBOX_APP_SECRET"))
-
-    authorize_url = auth_flow.start()
-    print("1. Go to: " + authorize_url)
-    print("2. Click \"Allow\" (you might have to log in first).")
-    print("3. Copy the authorization code.")
-    auth_code = input("Enter the authorization code here: ").strip()
-
+    """Create Dropbox client using refresh token stored in environment"""
     try:
-        oauth_result = auth_flow.finish(auth_code)
-    except Exception as e:
-        print('Error: %s' % (e,))
-        exit(1)
-
-    with dropbox.Dropbox(oauth2_access_token=oauth_result.access_token) as dbx:
+        dbx = dropbox.Dropbox(
+            app_key=os.getenv("DROPBOX_APP_KEY"),
+            app_secret=os.getenv("DROPBOX_APP_SECRET"),
+            oauth2_refresh_token=os.getenv("DROPBOX_REFRESH_TOKEN")
+        )
+        
+        # Test the connection
         dbx.users_get_current_account()
-        print("Successfully set up client!")
         return dbx
+        
+    except Exception as e:
+        print(f'Error creating Dropbox client: {e}')
+        raise
 
 def orchestrate_upload_workflow(overwrite=False, client=None):
     for file_name in os.listdir(STORAGE_DIR):
@@ -153,19 +152,23 @@ def _upload_file_to_dropbox(client, file_path, overwrite=False):
 
     try:
         with open(file_path, 'rb') as f:
-            mode = dropbox.files.WriteMode.overwrite if overwrite else dropbox.files.WriteMode.add
+            mode = WriteMode.overwrite if overwrite else WriteMode.add
             dbx.files_upload(f.read(), upload_path, mode=mode)
         print(f"\tSuccessfully uploaded {file_name} to {upload_path}")
     except Exception as e:
         print(f"Error uploading {file_name} to Dropbox: {e}")
     
-def create_stata_output_file(file_name: str="complete.dta"):
-    """Reads the complete Parquet file and does some post-processing to ensure stata conversion is optimized."""
-    df = pd.read_parquet(f"{STORAGE_DIR}/complete.parquet")
+def create_stata_output_file(df,file_name):
+    """Reads the dataframe and does some post-processing to ensure stata conversion is optimized."""
+    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[rawText for rawText in df['rawText'] if len(rawText) == 4])
+    
     df = df.drop(columns='rawText')
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(zip(snippet_1, snippet_2, snippet_3, snippet_4))
+    
     stata_file_path = os.path.join(STORAGE_DIR, file_name)
     df.to_stata(stata_file_path, version=118)
     print(f"Successfully generated {stata_file_path}")
+    return df
 
 def import_files_from_dropbox(client=None):
     """Imports files from Dropbox into the storage directory."""
@@ -177,15 +180,129 @@ def import_files_from_dropbox(client=None):
         dbx = dropbox.Dropbox(access_token)
     
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    files = dbx.files_list_folder(f'/{dropbox_folder}/')
+    files = dbx.files_list_folder(f'/{dropbox_folder}/data-files/')
     for file in files.entries:
         if file.name.endswith('.parquet'):
             print(f"Downloading {file.path_lower}")
-            dbx.files_download_to_file(os.path.join(STORAGE_DIR, file.name), file.path_lower)
+            dbx.files_download_to_file(os.path.join(STORAGE_DIR, 'dataset', file.name), file.path_lower)
 
-def generate_sample_output_file(filename='sample.xlsx', n_samples=200):
-    """Reads the complete Parquet file, randomly samples n_samples rows, and writes to an Excel file."""
+def generate_sample_output_file(filename='sample.xlsx', n_samples=200, onlyIsProfessor=False):
+    """Reads the complete Parquet file, randomly samples n_samples rows, and writes to an Excel file.
+    If onlyIsProfessor is True, samples only from rows where isProfessor is True.
+    """
     df = pd.read_parquet(f"{STORAGE_DIR}/complete.parquet")
+    
+    if onlyIsProfessor:
+        df = df[df['isProfessor'] == True]
+    
     sample_df = df.sample(n=n_samples)
     sample_df.to_excel(os.path.join(STORAGE_DIR, filename), index=False)
     print(f"Successfully generated {filename} with {n_samples} samples.")
+
+def upload_large_file(dbx, file_path, dropbox_file_path):
+    CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
+    file_size = os.path.getsize(file_path)
+
+    with open(file_path, "rb") as f:
+        if file_size <= CHUNK_SIZE:
+            # If the file is small enough, upload it directly
+            dbx.files_upload(f.read(), dropbox_file_path, mode=WriteMode.overwrite)
+        else:
+            # Chunked upload
+            upload_session_start_result = dbx.files_upload_session_start(f.read(CHUNK_SIZE))
+            session_id = upload_session_start_result.session_id
+            cursor = dropbox.files.UploadSessionCursor(session_id=session_id, offset=f.tell())
+            commit = dropbox.files.CommitInfo(path=dropbox_file_path, mode=WriteMode.overwrite)
+
+            # Initialize progress bar
+            with tqdm(total=file_size, unit='B', unit_scale=True, desc="Uploading") as pbar:
+                pbar.update(CHUNK_SIZE)  # Update for the first chunk
+
+                while f.tell() < file_size:
+                    if (file_size - f.tell()) <= CHUNK_SIZE:
+                        dbx.files_upload_session_finish(f.read(CHUNK_SIZE), cursor, commit)
+                    else:
+                        dbx.files_upload_session_append(f.read(CHUNK_SIZE), cursor.session_id, cursor.offset)
+                        cursor.offset = f.tell()
+                    
+                    pbar.update(CHUNK_SIZE)  # Update progress bar after each chunk
+
+def push_new_dataset_files_to_dropbox(dbx):
+    """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
+    # Define Dropbox folder and local cache path
+    dropbox_folder = os.getenv("DROPBOX_FOLDER")
+    local_cache_path = f"{STORAGE_DIR}/dataset"
+
+    # Check for CSV files in the local cache
+    csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
+    if not csv_files:
+        print("No CSV files found in the local cache!")
+        return
+    
+    # Upload all CSV files from local cache with progress bar
+    with tqdm(total=len(csv_files), desc="Uploading CSVs", unit="file") as pbar:
+        for file_name in csv_files:
+            local_file_path = os.path.join(local_cache_path, file_name)
+            safe_file_name = file_name.replace(" ", "_")
+            dropbox_file_path = os.path.join(dropbox_folder, "dataset", safe_file_name)
+
+            with open(local_file_path, "rb") as f:
+                dbx.files_upload(f.read(), dropbox_file_path, mode=WriteMode.add)
+            
+            # Update progress bar after each successful upload
+            pbar.set_postfix(file=file_name)
+            pbar.update(1)
+
+    # Upload [updating] parquet file without deleting it
+    file_path = os.path.join(STORAGE_DIR, 'dataset', PARQUET_FILE_NAME)
+    dropbox_file_path = os.path.join(dropbox_folder, 'data-files', PARQUET_FILE_NAME)
+
+    upload_large_file(dbx, file_path, dropbox_file_path)
+
+    print("Upload complete! Removing local CSV files...")
+
+    # clean up local cache once upload finishes
+    for file_name in csv_files:
+        local_file_path = os.path.join(local_cache_path, file_name)
+        os.remove(local_file_path)
+
+    print("Sync Complete!")
+
+def update_parquet_file(df: pd.DataFrame, parquet_file_path: str, processed_ids):
+    """
+    Updates a Parquet file with information from the provided DataFrame, matching on id_text.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing the new information
+        parquet_file_path (str): Path to the Parquet file to be updated
+        processed_ids (list): List of id_text values to mark as processed
+    """
+    # Read the existing Parquet file
+    parquet_df = pd.read_parquet(parquet_file_path)
+    
+    # Ensure id_text is string type in both DataFrames
+    parquet_df['id_text'] = parquet_df['id_text'].astype(str)
+    df['id_text'] = df['id_text'].astype(str)
+    
+    # Convert rawText lists directly to snippet columns
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = pd.DataFrame(df['rawText'].tolist(), index=df.index)
+    df = df.drop(columns='rawText')
+    
+    # Create a mapping of id_text to row updates
+    update_dict = df.set_index('id_text').to_dict('index')
+    
+    # Update matching rows
+    for idx, row in parquet_df.iterrows():
+        if row['id_text'] in update_dict:
+            for col, value in update_dict[row['id_text']].items():
+                if col in parquet_df.columns:  # Update if column exists
+                    parquet_df.at[idx, col] = value
+                else:  # Add new column if it doesn't exist
+                    parquet_df[col] = None  # Initialize new column with None
+                    parquet_df.at[idx, col] = value  # Set the value for the new column
+    
+    # Mark rows as processed
+    parquet_df.loc[parquet_df['id_text'].isin(processed_ids), 'isProcessed'] = True
+    
+    # Save the updated DataFrame back to Parquet format
+    parquet_df.to_parquet(parquet_file_path, index=False)
