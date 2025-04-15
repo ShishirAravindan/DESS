@@ -8,8 +8,8 @@ from dropbox.files import WriteMode
 
 load_dotenv()
 
-STORAGE_DIR = "/Users/akhil/Desktop/RA-Scraping/DESS/storage"
-PARQUET_FILE_NAME = "akhil-toSearch-2025-02-11.parquet"
+STORAGE_DIR = os.getenv("STORAGE_DIR")
+PARQUET_FILE_NAME = "shishir-toSearch-2025-02-11.parquet"
 
 def get_new_rows():
     """Reads the master (stata) dataset and returns new rows not present in 'complete' or 'reprocess' files."""
@@ -180,7 +180,7 @@ def import_files_from_dropbox(client=None):
         dbx = dropbox.Dropbox(access_token)
     
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    files = dbx.files_list_folder(f'/{dropbox_folder}/dataset/')
+    files = dbx.files_list_folder(f'/{dropbox_folder}/data-files/')
     for file in files.entries:
         if file.name.endswith('.parquet'):
             print(f"Downloading {file.path_lower}")
@@ -231,12 +231,13 @@ def push_new_dataset_files_to_dropbox(dbx):
     """Pushes CSV file generated from API calls to the dropbox folder and empties local cache"""
     # Define Dropbox folder and local cache path
     dropbox_folder = os.getenv("DROPBOX_FOLDER")
-    local_cache_path = f'{STORAGE_DIR}/dataset/'
+    local_cache_path = f"{STORAGE_DIR}/dataset"
 
     # Check for CSV files in the local cache
     csv_files = [f for f in os.listdir(local_cache_path) if f.endswith('.csv')]
     if not csv_files:
         print("No CSV files found in the local cache!")
+        return
     
     # Upload all CSV files from local cache with progress bar
     with tqdm(total=len(csv_files), desc="Uploading CSVs", unit="file") as pbar:
@@ -254,7 +255,7 @@ def push_new_dataset_files_to_dropbox(dbx):
 
     # Upload [updating] parquet file without deleting it
     file_path = os.path.join(STORAGE_DIR, 'dataset', PARQUET_FILE_NAME)
-    dropbox_file_path = os.path.join(dropbox_folder, 'dataset', PARQUET_FILE_NAME)
+    dropbox_file_path = os.path.join(dropbox_folder, 'data-files', PARQUET_FILE_NAME)
 
     upload_large_file(dbx, file_path, dropbox_file_path)
 
@@ -267,13 +268,14 @@ def push_new_dataset_files_to_dropbox(dbx):
 
     print("Sync Complete!")
 
-def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
+def update_parquet_file(df: pd.DataFrame, parquet_file_path: str, processed_ids):
     """
     Updates a Parquet file with information from the provided DataFrame, matching on id_text.
     
     Args:
         df (pd.DataFrame): DataFrame containing the new information
         parquet_file_path (str): Path to the Parquet file to be updated
+        processed_ids (list): List of id_text values to mark as processed
     """
     # Read the existing Parquet file
     parquet_df = pd.read_parquet(parquet_file_path)
@@ -281,10 +283,11 @@ def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
     # Ensure id_text is string type in both DataFrames
     parquet_df['id_text'] = parquet_df['id_text'].astype(str)
     df['id_text'] = df['id_text'].astype(str)
-    snippet_1, snippet_2, snippet_3, snippet_4 = zip(*[rawText for rawText in df['rawText'] if len(rawText) == 4])
     
+    # Convert rawText lists directly to snippet columns
+    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = pd.DataFrame(df['rawText'].tolist(), index=df.index)
     df = df.drop(columns='rawText')
-    df[['snippet_1', 'snippet_2', 'snippet_3', 'snippet_4']] = list(zip(snippet_1, snippet_2, snippet_3, snippet_4))
+    
     # Create a mapping of id_text to row updates
     update_dict = df.set_index('id_text').to_dict('index')
     
@@ -297,6 +300,9 @@ def update_parquet_file(df: pd.DataFrame, parquet_file_path: str):
                 else:  # Add new column if it doesn't exist
                     parquet_df[col] = None  # Initialize new column with None
                     parquet_df.at[idx, col] = value  # Set the value for the new column
+    
+    # Mark rows as processed
+    parquet_df.loc[parquet_df['id_text'].isin(processed_ids), 'isProcessed'] = True
     
     # Save the updated DataFrame back to Parquet format
     parquet_df.to_parquet(parquet_file_path, index=False)

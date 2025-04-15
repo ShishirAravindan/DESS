@@ -4,11 +4,13 @@ import pandas as pd
 from dotenv import load_dotenv
 import requests
 import csv
+import logging
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 BASE_URL = "https://www.googleapis.com/customsearch/v1"
-DATASET_DIR = "/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/"
+DATASET_DIR = f"{os.getenv('STORAGE_DIR')}/dataset"
 
 def _build_payload(search_query, date_restrict):
     """Constructs the payload for the Google Custom Search API request."""
@@ -27,6 +29,7 @@ def make_API_CALL(search_query, date_restrict=None):
         results = response.json()
         df_results = pd.json_normalize(results.get('items', []))
         file_name = '_'.join(search_query.split(" "))
+        file_name = file_name.replace('/', '_').replace('\\', '_')
         df_results.to_csv(f"{DATASET_DIR}/{file_name}.csv", index=False, quoting=csv.QUOTE_ALL)
         
         return f"{DATASET_DIR}/{file_name}.csv"
@@ -42,54 +45,63 @@ def _clean_strings(text):
     return text
 
 def _get_rawText(filePath):
-    """
-    Reads a CSV file, uses a separate function to clean strings, combines title and snippet for each row,
-    and returns the first 4 rows as a list.  Handles potential errors gracefully.
-    """
+    """Reads a CSV file and returns list of combined title/snippet text or None if any failure occurs."""
     try:
         df = pd.read_csv(filePath, on_bad_lines='warn', encoding='utf-8')
-
+        
+        # Check if DataFrame is empty
+        if df.empty:
+            logger.warning(f"CSV file {filePath} contains no data")
+            return None
+        
         if 'title' not in df.columns or 'snippet' not in df.columns:
-            raise ValueError(f"'title' or 'snippet' column missing in {filePath}")
-
-        # Use the separate cleaning function
+            logger.warning(f"Missing required columns in {filePath}")
+            return None
+            
         df['title'] = df['title'].apply(_clean_strings)
         df['snippet'] = df['snippet'].apply(_clean_strings)
-
         df['combined'] = df['title'].fillna('') + ' ' + df['snippet'].fillna('')
+        
         rawText = df['combined'].tolist()[:4]
-        return rawText if len(rawText) > 0 else None
-
+        return rawText if rawText else None
     except Exception as e:
-        print(f"An unexpected error occurred while processing {filePath}: {e}")
-        raise e
+        logger.error(f"Failed to process file {filePath}: {e}")
+        return None
 
 def populate_rawText_col(df):
     """
-    Populates a new 'rawText' column in the input DataFrame.  If a Google Custom Search API call fails, 
-    the corresponding 'rawText' entry is set to "NaN".
+    Populates the rawText column in the DataFrame. Any failure (API error, empty results, 
+    file processing error) will result in None values that can be filtered with isna().
 
     Args:
         df (pd.DataFrame): DataFrame containing an 'id_text' column.
 
     Returns:
-        pd.DataFrame: DataFrame with an added 'rawText' column.
+        pd.DataFrame: DataFrame with populated 'rawText' column, None for any failures.
     """
-    df['rawText'] = None  # Initialize the column
+    df['rawText'] = None
+
+    # Log only at the beginning of processing
+    logger.info(f"Starting to process {len(df)} rows for API calls")
 
     for index, row in df.iterrows():
         id_text = row['id_text']
         try:
             file_name = make_API_CALL(id_text)
             raw_text = _get_rawText(file_name)
-            df.at[index, 'rawText'] = raw_text if raw_text is not None else ["NaN"] 
+            df.at[index, 'rawText'] = raw_text
         except Exception as e:
-            print(f"Error processing {id_text}: {e}")
-            df.at[index, 'rawText'] = ["NaN"]
+            logger.error(f"Error processing row {index} ({id_text}): {e}")
 
     return df
         
 if __name__=='__main__':
     search_query = 'Ngoyi Bukonda northern illinois university'
     make_API_CALL(search_query, "y15")
+    test_df = pd.DataFrame({
+        'id_text': ['Donald Kluemperjr louisiana state university and agricultural & mechanical college']
+    })
+    df2 = populate_rawText_col(test_df)
+    df_errors = df2[df2['rawText'].isna()]
+    df_errors[['id_text']].to_csv('errors.csv', mode='a', index=False)
         
