@@ -1,4 +1,4 @@
-from dess.llms.llm_base import LLMBase
+from llms.llm_base import LLMBase
 import google.generativeai as genai
 from typing import List
 import os
@@ -18,6 +18,8 @@ class GeminiLLM(LLMBase):
         
         genai.configure(api_key=api_key)
         self.llm = genai.GenerativeModel(model_name)
+        # for model in genai.list_models():
+        #     print(model.name)
         
     def get_response(self, prompt: str) -> str:
         """Get response for a single prompt."""
@@ -51,5 +53,3 @@ class GeminiLLM(LLMBase):
         ]
         
         return self.get_batch_responses(prompts)
-
-        

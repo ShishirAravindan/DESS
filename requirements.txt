@@ -95,3 +95,5 @@ weasel==0.4.1
 websocket-client==1.8.0
 wrapt==1.16.0
 wsproto==1.2.0
+google-generativeai=0.8.5
+openai=1.75.0
