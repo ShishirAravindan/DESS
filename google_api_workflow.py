@@ -59,13 +59,13 @@ def end_to_end_workflow():
     # 4. Update out files
     dpm.update_parquet_file(df_non_errors, FILE_PATH, processed_ids)
 
-        # 5. Cloud Sync and local cleanup
+    # 5. Cloud Sync and local cleanup
     logging.info("Starting Phase 3: Uploading to dropbox...")
     dbx = dpm.dropbox_oauth()
     dpm.push_new_dataset_files_to_dropbox(dbx)
     logging.info("[COMPLETE] Phase 3: Dropbox sync")
         
-        # 6. Logging & Metrics
+    # 6. Logging & Metrics
     processed_count = len(df_non_errors)
     logging.info(f"Processed {processed_count} rows. Error {len(df) - processed_count} rows.")
     

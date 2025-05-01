@@ -4,3 +4,4 @@ storage/
 .env
 __pycache__/
 .DS_Store
+temp_files/
