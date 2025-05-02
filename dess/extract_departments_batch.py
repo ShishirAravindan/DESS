@@ -1,7 +1,7 @@
 import pandas as pd
 import argparse
 import os
-from dess.batch_inference.factory import BatchInferencePipelineFactory
+from batch_inference.factory import BatchInferencePipelineFactory
 
 def extract_departments_batch(
     input_file: str,

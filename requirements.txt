@@ -97,3 +97,5 @@ wrapt==1.16.0
 wsproto==1.2.0
 google-generativeai=0.8.5
 openai=1.75.0
+google-cloud-storage=3.1.0
+google-genai=1.13.0

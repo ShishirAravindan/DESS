@@ -5,7 +5,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
-from dess.batch_inference.base import BatchInferencePipeline
+from batch_inference.base import BatchInferencePipeline
 
 class OpenAIBatchInferencePipeline(BatchInferencePipeline):
     """

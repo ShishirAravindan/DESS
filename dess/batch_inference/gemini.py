@@ -8,7 +8,7 @@ from google.cloud import storage
 from google import genai
 from google.genai.types import CreateBatchJobConfig, JobState, HttpOptions
 from dotenv import load_dotenv
-from dess.batch_inference.base import BatchInferencePipeline
+from batch_inference.base import BatchInferencePipeline
 
 class GeminiBatchInferencePipeline(BatchInferencePipeline):
     """
@@ -197,3 +197,9 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
         
         # Return updated dataframe
         return df 
+    
+if __name__=='__main__':
+    df_test  = pd.read_parquet('/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/test_llm.parquet')
+    
+    
+    

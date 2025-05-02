@@ -1,6 +1,6 @@
-from dess.batch_inference.base import BatchInferencePipeline
-from dess.batch_inference.gemini import GeminiBatchInferencePipeline
-from dess.batch_inference.openai import OpenAIBatchInferencePipeline
+from batch_inference.base import BatchInferencePipeline
+from batch_inference.gemini import GeminiBatchInferencePipeline
+from batch_inference.openai import OpenAIBatchInferencePipeline
 
 class BatchInferencePipelineFactory:
     """
@@ -22,9 +22,9 @@ class BatchInferencePipelineFactory:
         Raises:
             ValueError: If the provider is not supported
         """
-        if provider == "gemini":
+        if provider.split('-')[0] == "gemini":
             return GeminiBatchInferencePipeline(provider)
-        elif provider == "openai":
+        elif provider.split('-')[0] == "gpt":
             return OpenAIBatchInferencePipeline(provider)
         else:
             raise ValueError(f"Unsupported model provider: {provider}") 
