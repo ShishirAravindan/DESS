@@ -6,9 +6,10 @@ import time
 from typing import Dict, Any, Optional
 from google.cloud import storage
 from google import genai
+from google.genai import types
 from google.genai.types import CreateBatchJobConfig, JobState, HttpOptions
 from dotenv import load_dotenv
-from batch_inference.base import BatchInferencePipeline
+from .base import BatchInferencePipeline
 
 class GeminiBatchInferencePipeline(BatchInferencePipeline):
     """
@@ -24,15 +25,13 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
         """
         load_dotenv()
         self.model_name = model_name
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable not set")
-        
-        self.client = genai.Client(http_options=HttpOptions(api_version="v1"))
+            
+        # Initialize the client with Vertex AI settings
+        self.client = genai.Client(http_options=types.HttpOptions(api_version='v1'))
         
     def prepare_batch_file(self, df: pd.DataFrame, output_file: str) -> Dict[str, Any]:
         """
-        Creates JSONL batch file in format required by Gemini API.
+        Creates JSONL batch file in format required by Vertex AI batch predictions.
         
         Args:
             df (pd.DataFrame): DataFrame containing faculty data
@@ -64,16 +63,21 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
                     'id_text': row['id_text']
                 })
 
+                # Format according to Vertex AI batch prediction requirements
                 instance = {
-                    "contents": {
-                        "role": "user",
-                        "parts": [{
-                            "text": f"""Given the following text about a professor or faculty member, extract their department name.
-                            If no department is mentioned, return "MISSING". Only return the department name, nothing else.
-
-                            Text: {row['rawText']}
-                            Department:"""
-                        }]
+                    "request": {
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [{
+                                    "text": f"""Given the following text about a professor or faculty member, extract their department name.
+                                    If no department is mentioned, return "MISSING". Only return the department name, nothing else.
+                                    
+                                    Text: {row['rawText']}
+                                    Department:"""
+                                }]
+                            }
+                        ]
                     }
                 }
                 f.write(json.dumps(instance) + "\n")
@@ -196,10 +200,35 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
         row_mapping = mapping.get("row_mapping", [])
         
         # Return updated dataframe
-        return df 
+        return df
+
+def test_main():
+    pipeline = GeminiBatchInferencePipeline(model_name="gemini-2.0-flash-001")
+    df_test  = pd.read_parquet('/Users/shishiraravindan/Documents/work-RA/dess/storage/test_batch.parquet')
+    
+    # Create batch file
+    batch_info = pipeline.prepare_batch_file(df_test, 'batch_requests.jsonl')
+    print("Batch file created")
+    
+    # Upload to GCS
+    source_uri = pipeline.upload_batch_file(
+       batch_info['file_path'],
+       'dess-llm-jobs',
+       'batch_requests.jsonl'
+   )
+    print("Batch file uploaded to GCS")
+   
+    # Create and run batch job
+    output_uri = 'gs://dess-llm-jobs/output/'
+    job = pipeline.create_batch_job(source_uri, output_uri)
+    print("Batch job created")
+   
+    # Wait for completion
+    completed_job = pipeline.wait_for_completion(job)
+    print("Batch job completed")
+
+    # alt: open result file to unpack
+    
     
 if __name__=='__main__':
-    df_test  = pd.read_parquet('/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/test_llm.parquet')
-    
-    
-    
+    test_main()
