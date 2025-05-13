@@ -222,17 +222,14 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
 
         return df
         
-        # For now, this is a placeholder
-        df['department_llm'] = None  # Initialize column
-        
-        # Use mapping to update the department_llm column
-        row_mapping = mapping.get("row_mapping", [])
-        
-        # Return updated dataframe
-        return df 
     
-if __name__=='__main__':
+def test_main():
+    pipeline = GeminiBatchInferencePipeline(model_name="gemini-2.0-flash-001")
     df_test  = pd.read_parquet('/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/test_llm.parquet')
+
+    # Create batch file
+    batch_info = pipeline.prepare_batch_file(df_test, 'batch_requests.jsonl')
+    print("Batch file created")
     
     # Upload to GCS
     source_uri = pipeline.upload_batch_file(
