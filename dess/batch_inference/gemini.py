@@ -192,6 +192,35 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
         # 1. Getting the output path from job_reference
         # 2. Downloading results from GCS
         # 3. Parsing results and mapping them back to the original dataframe
+         # Extract output GCS path
+        gcs_output_uri = job_reference.output_config['gcsDestination']['outputUriPrefix']  # Or adjust based on actual object structure
+
+        # Initialize GCS client
+        client = storage.Client()
+        bucket_name, prefix = gcs_output_uri.replace("gs://", "").split("/", 1)
+        bucket = client.bucket(bucket_name)
+
+        # List blobs under output prefix
+        blobs = list(bucket.list_blobs(prefix=prefix))
+        result_blobs = [blob for blob in blobs if blob.name.endswith(".jsonl")]
+
+        # Collect results from all JSONL files
+        results = []
+        for blob in result_blobs:
+            content = blob.download_as_text()
+            for line in content.strip().splitlines():
+                data = json.loads(line)
+                results.append(data.get('output', None))  # Adjust key if needed
+
+        # Initialize the new column
+        df['department_llm'] = None
+        
+        # Use mapping to assign results back to DataFrame
+        row_mapping = mapping.get("row_mapping", [])
+        for idx, result in zip(row_mapping, results):
+            df.at[idx, 'department_llm'] = result
+
+        return df
         
         # For now, this is a placeholder
         df['department_llm'] = None  # Initialize column
@@ -200,15 +229,10 @@ class GeminiBatchInferencePipeline(BatchInferencePipeline):
         row_mapping = mapping.get("row_mapping", [])
         
         # Return updated dataframe
-        return df
-
-def test_main():
-    pipeline = GeminiBatchInferencePipeline(model_name="gemini-2.0-flash-001")
-    df_test  = pd.read_parquet('/Users/shishiraravindan/Documents/work-RA/dess/storage/test_batch.parquet')
+        return df 
     
-    # Create batch file
-    batch_info = pipeline.prepare_batch_file(df_test, 'batch_requests.jsonl')
-    print("Batch file created")
+if __name__=='__main__':
+    df_test  = pd.read_parquet('/Users/akhil/Desktop/RA-Scraping/DESS/storage/dataset/test_llm.parquet')
     
     # Upload to GCS
     source_uri = pipeline.upload_batch_file(
