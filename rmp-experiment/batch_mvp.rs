@@ -2,7 +2,8 @@ use rateMyProfessorApi_rs::methods::RateMyProfessor;
 use anyhow::Result;
 use std::env;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use arrow::array::{Array, StringArray, ArrayRef};
 use arrow::record_batch::RecordBatch;
@@ -10,6 +11,8 @@ use parquet::arrow::{arrow_reader::ParquetRecordBatchReaderBuilder, ArrowWriter}
 use arrow::datatypes::{DataType, Field, Schema};
 use parquet::file::properties::WriterProperties;
 use std::sync::Arc;
+use sanitize_filename::sanitize;
+use serde_json;
 
 #[derive(Debug, Clone)]
 struct ProfessorQuery {
@@ -173,6 +176,37 @@ fn group_queries_by_university(queries: Vec<ProfessorQuery>) -> HashMap<String, 
 
 
 
+/// Build cache file path for a given university, ensuring directory exists
+fn cache_file_path_for_university(university: &str) -> PathBuf {
+	let mut dir = PathBuf::from("rmp-experiment/storage/api");
+	// Best-effort to create the directory
+	let _ = fs::create_dir_all(&dir);
+	let filename = format!("{}.json", sanitize(&university.to_lowercase()));
+	dir.push(filename);
+	dir
+}
+
+/// Try to load cached name->department map for a university
+fn load_cached_department_map(university: &str) -> Option<HashMap<String, String>> {
+	let path = cache_file_path_for_university(university);
+	if path.exists() {
+		if let Ok(file) = File::open(path) {
+			if let Ok(map) = serde_json::from_reader::<_, HashMap<String, String>>(file) {
+				return Some(map);
+			}
+		}
+	}
+	None
+}
+
+/// Save name->department map for a university to cache
+fn save_department_map_to_cache(university: &str, map: &HashMap<String, String>) {
+	let path = cache_file_path_for_university(university);
+	if let Ok(file) = File::create(path) {
+		let _ = serde_json::to_writer_pretty(file, map);
+	}
+}
+
 /// Process universities with actual API calls
 async fn process_universities(
     queries_by_university: HashMap<String, Vec<ProfessorQuery>>
@@ -191,81 +225,97 @@ async fn process_universities(
     
     // Process each university once
     for (university, university_queries) in queries_by_university {
-        stats.print_progress(processed_count, &university);
-        
-        let api_start = Instant::now();
-        
-        // Single API call per university
-        let mut rate_my_professor_instance = RateMyProfessor::construct_college(&university);
-        stats.api_calls_made += 1;
-        
-        match rate_my_professor_instance.get_professor_list().await {
-            Ok(professor_list) => {
-                let api_duration = api_start.elapsed();
-                println!("   ✅ Found {} professors in {:?}", professor_list.len(), api_duration);
-                
-                // Build lookup map for this university
-                let mut name_to_department: HashMap<String, String> = HashMap::new();
-                for prof in &professor_list {
-                    if let (Some(first), Some(last), Some(dept)) = (&prof.first_name, &prof.last_name, &prof.department) {
-                        let full_name = format!("{} {}", first, last).to_lowercase();
-                        name_to_department.insert(full_name, dept.clone());
-                    }
-                }
-                
-                // Process all queries for this university
-                let mut local_matches = 0;
-                let total_queries_for_university = university_queries.len();
-                for query in university_queries {
-                    let search_name = query.professor_name.to_lowercase();
-                    let department_rmp = name_to_department.get(&search_name).cloned()
-                        .or_else(|| {
-                            // Try partial matching
-                            for (stored_name, dept) in &name_to_department {
-                                if stored_name.contains(&search_name) || search_name.contains(stored_name) {
-                                    return Some(dept.clone());
-                                }
-                            }
-                            None
-                        });
-                    
-                    if department_rmp.is_some() {
-                        local_matches += 1;
-                        stats.successful_matches += 1;
-                    }
-                    
-                    all_results.push(ProfessorResult {
-                        university: query.university,
-                        firstname: query.firstname,
-                        lastname: query.lastname,
-                        department_rmp,
-                        row_index: query.row_index,
-                    });
-                }
-                
-                println!("   📊 Matched {}/{} professors from this university", 
-                         local_matches, total_queries_for_university);
-            }
-            Err(e) => {
-                println!("   ❌ Error fetching professors: {}", e);
-                
-                // Add error results for all queries from this university
-                for query in university_queries {
-                    all_results.push(ProfessorResult {
-                        university: query.university,
-                        firstname: query.firstname,
-                        lastname: query.lastname,
-                        department_rmp: None,
-                        row_index: query.row_index,
-                    });
-                }
-            }
-        }
-        
-        processed_count += 1;
-        
-        // Add a small delay to be respectful to the API
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+		stats.print_progress(processed_count, &university);
+
+		// First try cache
+		let mut used_api_call = false;
+		let mut name_to_department_opt = load_cached_department_map(&university);
+		if let Some(ref map) = name_to_department_opt {
+			println!("   💽 Cache hit: loaded {} professors", map.len());
+		}
+
+		// If no cache, call API and cache results
+		if name_to_department_opt.is_none() {
+			let api_start = Instant::now();
+			let mut rate_my_professor_instance = RateMyProfessor::construct_college(&university);
+			stats.api_calls_made += 1;
+			used_api_call = true;
+
+			match rate_my_professor_instance.get_professor_list().await {
+				Ok(professor_list) => {
+					let api_duration = api_start.elapsed();
+					println!("   ✅ Found {} professors in {:?}", professor_list.len(), api_duration);
+
+					let mut name_to_department: HashMap<String, String> = HashMap::new();
+					for prof in &professor_list {
+						if let (Some(first), Some(last), Some(dept)) = (&prof.first_name, &prof.last_name, &prof.department) {
+							let full_name = format!("{} {}", first, last).to_lowercase();
+							name_to_department.insert(full_name, dept.clone());
+						}
+					}
+
+					// Save to cache (best-effort)
+					save_department_map_to_cache(&university, &name_to_department);
+					println!("   💾 Cached results for '{}'", &university);
+
+					name_to_department_opt = Some(name_to_department);
+				}
+				Err(e) => {
+					println!("   ❌ Error fetching professors: {}", e);
+				}
+			}
+		}
+
+		if let Some(name_to_department) = name_to_department_opt {
+			let mut local_matches = 0;
+			let total_queries_for_university = university_queries.len();
+			for query in university_queries {
+				let search_name = query.professor_name.to_lowercase();
+				let department_rmp = name_to_department.get(&search_name).cloned()
+					.or_else(|| {
+						for (stored_name, dept) in &name_to_department {
+							if stored_name.contains(&search_name) || search_name.contains(stored_name) {
+								return Some(dept.clone());
+							}
+						}
+						None
+					});
+
+				if department_rmp.is_some() {
+					local_matches += 1;
+					stats.successful_matches += 1;
+				}
+
+				all_results.push(ProfessorResult {
+					university: query.university,
+					firstname: query.firstname,
+					lastname: query.lastname,
+					department_rmp,
+					row_index: query.row_index,
+				});
+			}
+
+			println!("   📊 Matched {}/{} professors from this university",
+					 local_matches, total_queries_for_university);
+		} else {
+			// No data (cache miss + API error): push None for all queries
+			for query in university_queries {
+				all_results.push(ProfessorResult {
+					university: query.university,
+					firstname: query.firstname,
+					lastname: query.lastname,
+					department_rmp: None,
+					row_index: query.row_index,
+				});
+			}
+		}
+
+		processed_count += 1;
+
+		// Be respectful to the API only when we actually made a call
+		if used_api_call {
+			tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+		}
     }
     
     // Final statistics
