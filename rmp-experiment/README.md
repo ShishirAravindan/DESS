@@ -191,7 +191,7 @@ The script includes comprehensive error handling:
 
 ### Integration with DESS Project
 
-This script integrates with the larger DESS (Department Extraction using Search and spaCy) project:
+This script integrates with the larger DESS (Department Extraction from Search Snippets) project:
 
 - Uses shared Dropbox authentication from `data_pipeline_manager.py`
 - Complements the web scraping department extraction workflow

@@ -1,4 +1,4 @@
-# DESS: Department Extraction using Search and spaCy
+# DESS: Department Extraction from Search Snippets
 
 DESS is an automated data pipeline designed to extract faculty department information from university faculty databases. The system processes faculty names and universities to populate missing department information through web search and natural language processing.
 
