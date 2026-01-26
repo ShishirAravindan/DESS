@@ -41,10 +41,10 @@ DESS/
 ├── data_pipeline_manager.py     # Data flow and file management
 ├── workflow.ipynb               # Interactive workflow notebook
 ├── stata_conversion.py          # Stata format utilities
-├── dropbox_auth.py              # Dropbox OAuth setup utility
 ├── dess/                        # Core modules
 │   ├── nlp.py                   # Department extraction logic
 │   ├── stats.py                 # Progress tracking utilities
+│   ├── dropbox_auth.py          # Dropbox OAuth setup utility
 │   └── search.py                # (Archived) Selenium scraper
 ├── llm-batch-experiment/        # (Archived) LLM-based extraction experiment
 ├── rmp-experiment/              # Rate My Professor API integration
@@ -175,12 +175,8 @@ See individual experiment folders for details:
 
 ### Google Custom Search API
 - **Rate Limits**: 100 queries/day on free tier, 10,000 queries/day on paid tier ($5 per 1,000 queries)
-- **Result Quality**: Search results may vary; some faculty members may not have indexed web presence
+- **Result Quality**: Some faculty members may not have indexed web presence
 - **Terms of Service**: Ensure compliance with Google's ToS for automated queries
-
-### Pattern Matching
-- Regex patterns capture single-word departments; multi-word departments (e.g., "Computer Science") may be partially extracted
-- Keyword whitelist requires manual curation for new domains
 
 ### Data Quality
 - Results depend on web presence of faculty members
@@ -194,6 +190,3 @@ The pipeline was run on a GCP VM for unattended batch processing. Key considerat
 - Set up Dropbox sync for result backup
 - Consider rate limits when processing large datasets
 
-## License
-
-This project was developed for academic research purposes.

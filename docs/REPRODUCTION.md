@@ -44,7 +44,7 @@ For cloud backup functionality:
 1. Go to [Dropbox App Console](https://www.dropbox.com/developers/apps)
 2. Create a new app with "Full Dropbox" access
 3. Generate an access token or use OAuth flow
-4. Run `python dropbox_auth.py` to set up OAuth tokens
+4. Run `python -m dess.dropbox_auth` to set up OAuth tokens
 
 ### 4. Environment Configuration
 
@@ -283,7 +283,7 @@ For unattended batch processing, the pipeline was deployed on a GCP VM:
 
 1. **VM Configuration**: e2-small instance sufficient for API-bound workload
 2. **Environment**: Python 3.9+ with dependencies installed
-3. **Storage**: Local SSD or persistent disk for storage directory
+3. **Storage**: Separate cloud storage (e.g. Dropbox, GCS) or local SSD/persistent disk for storage directory
 4. **Execution**: Run `google_api_workflow.py` via cron or systemd timer
 5. **Monitoring**: Check logs at `storage/API_WORKFLOW.LOG`
 
@@ -291,7 +291,6 @@ For unattended batch processing, the pipeline was deployed on a GCP VM:
 
 - **Rate Limits**: Free tier allows 100 queries/day; paid tier up to 10,000/day
 - **Cost**: $5 per 1,000 queries after free tier
-- **Reliability**: Use Dropbox sync for backup; restart from last checkpoint on failure
 - **Logging**: All operations logged to file for debugging
 
 ### Example Cron Setup
