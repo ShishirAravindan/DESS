@@ -38,7 +38,7 @@ def _process_string_columns(df):
     """Process string columns to comply with Stata requirements."""
     string_columns = [
         'university', 'lastname', 'firstname', 'id_text', 'department_textual',
-        'department_keyword', 'snippet_1', 'snippet_2', 'snippet_3', 'snippet_4'
+        'department_keyword', 'department_rmp', 'snippet_1', 'snippet_2', 'snippet_3', 'snippet_4'
     ]
     
     for col in string_columns:

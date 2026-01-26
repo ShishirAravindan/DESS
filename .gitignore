@@ -1,6 +1,16 @@
 internalUpdates.md
 storage/
-.*env/
+.*/
 .env
 __pycache__/
 .DS_Store
+temp_files/
+
+# Rust build and dependency files
+/target/
+**/target/
+Cargo.lock
+
+# Byproducts
+*.rs.bk
+*.rlib
